@@ -11,8 +11,9 @@
       "mode": "auto",
       "program": "${workspaceFolder}/main.go",
       "args": [
-        "--links",
-        "https://fuckingfast.co/4rf064iacmmb#Avowed_--_fitgirl-repacks.site_--_.part002.rar,https://fuckingfast.co/4rf064iacmmb#Avowed_--_fitgirl-repacks.site_--_.part002.rar,http://invalid"
+        "--inputFile",
+        "input.txt",
+        "savePath=D:\\ff"
       ]
     }
   ]
