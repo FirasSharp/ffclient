@@ -3,36 +3,32 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'  # Triggers on tags like v1.0.0, v2.1.3, etc.
-permissions:
-  contents: write  # Required to create releases
-  
+      - 'v*'
+
 jobs:
   build:
-    name: Build and Release
+    name: Build
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goos: [linux, darwin, windows]  # Build for Linux, MacOS, Windows
-        goarch: [amd64, arm64]           # Build for both architectures
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
       fail-fast: false
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Required to get git commit history
+          fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - uses: actions/setup-go@v4
         with:
-          go-version: "1.24.0"
+          go-version: '1.21'
 
-      - name: Get version from tag
+      - name: Get version
         id: tag
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Get commit hash
+      - name: Get commit
         id: commit
         run: echo "commit=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
@@ -45,24 +41,36 @@ jobs:
             -X 'main.date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")'" \
             -o ffclient-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }} .
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
         with:
           name: ffclient-${{ matrix.goos }}-${{ matrix.goarch }}
           path: ffclient-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
 
-      - name: Create release
-        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'  # Only run once
+  release:
+    name: Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ github.ref }}
+          release_name: "v${{ needs.build.outputs.version }}"
           files: |
-            ffclient-linux-amd64
-            ffclient-linux-arm64
-            ffclient-darwin-amd64
-            ffclient-darwin-arm64
-            ffclient-windows-amd64.exe
-            ffclient-windows-arm64.exe
-          draft: false
-          prerelease: false
+            artifacts/ffclient-linux-amd64
+            artifacts/ffclient-linux-arm64
+            artifacts/ffclient-darwin-amd64
+            artifacts/ffclient-darwin-arm64
+            artifacts/ffclient-windows-amd64.exe
+            artifacts/ffclient-windows-arm64.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
