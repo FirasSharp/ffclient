@@ -7,8 +7,7 @@ A fast and efficient command-line client for downloading files from [FuckingFast
 
 ## Features
 
-- Multi-file download support
-- Input from command line or text file
+- Multi-file download support (parallel)
 - Simple and fast
 - Cross-platform (Windows, Linux, macOS)
 
