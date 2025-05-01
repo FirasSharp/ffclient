@@ -24,7 +24,7 @@ type failed struct {
 }
 
 func ExecuteMultiDownload(savePath, inputFile, links string) error {
-	ffs := make([]*pkg.FF, 0)
+	ffs := make([]*pkg.FFDownloader, 0)
 	failed := failed{}
 	wg := new(sync.WaitGroup)
 	spinnerProgress := mpb.New(mpb.WithWaitGroup(wg))
