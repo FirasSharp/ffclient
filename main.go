@@ -27,6 +27,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
+	"time"
 
 	"github.com/FirasSharp/ffclient/cmd"
 	"github.com/SAP/jenkins-library/pkg/log"
@@ -41,11 +43,18 @@ type Options struct {
 
 var opts Options
 
+// Version will be set during build
+var (
+	version = "0.1.0-dev" // default version for dev builds
+	commit  = "none"
+	date    = "unknown"
+)
+
 var rootCmd = &cobra.Command{
 	Use:   "ff",
 	Short: "Client for multi download from https://fuckingfast.co/",
 	Long:  `Client made to download multiple files from the  https://fuckingfast.co/ hosting service.`,
-	Version: "0.1.0",
+	Version: fmt.Sprintf("%s\ncommit: %s\nbuilt: %s", version, getCommit(), getDate()),
 	Run: func(_ *cobra.Command, _ []string) {
 		if err := cmd.ExecuteMultiDownload(opts.savePath, opts.inputFile, opts.links); err != nil {
 			log.Entry().WithError(err).Fatal()
@@ -69,6 +78,38 @@ func main() {
 		log.Entry().Error(err)
 		os.Exit(1)
 	}
+}
+
+// getCommit returns the git commit hash
+func getCommit() string {
+	if commit != "" && commit != "none" {
+		return commit
+	}
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, setting := range info.Settings {
+			if setting.Key == "vcs.revision" {
+				return setting.Value[:7] // return short commit hash
+			}
+		}
+	}
+	return commit
+}
+
+// getDate returns the build date in readable format
+func getDate() string {
+	if date != "" && date != "unknown" {
+		return date
+	}
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, setting := range info.Settings {
+			if setting.Key == "vcs.time" {
+				if t, err := time.Parse(time.RFC3339, setting.Value); err == nil {
+					return t.Format("2006-01-02 15:04:05")
+				}
+			}
+		}
+	}
+	return time.Now().Format("2006-01-02 15:04:05")
 }
 
 func getDefaultDownloadPath() (string, error) {
