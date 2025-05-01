@@ -13,7 +13,8 @@
       "args": [
         "--inputFile",
         "input.txt",
-        "savePath=D:\\ff"
+        "--savePath",
+        "D:\\ff"
       ]
     }
   ]

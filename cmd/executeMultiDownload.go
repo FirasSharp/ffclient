@@ -2,15 +2,17 @@ package cmd
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
 
+	"net/http"
+
 	"github.com/FirasSharp/ffclient/pkg"
 	"github.com/SAP/jenkins-library/pkg/log"
-	_ "github.com/SAP/jenkins-library/pkg/log"
-	"github.com/vbauerster/mpb"
-	"github.com/vbauerster/mpb/decor"
+	"github.com/vbauerster/mpb/v8"
+	"github.com/vbauerster/mpb/v8/decor"
 )
 
 type failureInfo struct {
@@ -23,12 +25,12 @@ type failed struct {
 	sy    sync.Mutex
 }
 
+var failure = &failed{}
+
 func ExecuteMultiDownload(savePath, inputFile, links string) error {
-	ffs := make([]*pkg.FFDownloader, 0)
-	failed := failed{}
+
 	wg := new(sync.WaitGroup)
 	spinnerProgress := mpb.New(mpb.WithWaitGroup(wg))
-	downloadProgressBar := mpb.New(mpb.WithWaitGroup(wg))
 
 	urls, err := getUrls(inputFile, links)
 
@@ -36,8 +38,34 @@ func ExecuteMultiDownload(savePath, inputFile, links string) error {
 		return err
 	}
 
-	spinner := spinnerProgress.AddSpinner(int64(len(urls)), mpb.SpinnerOnLeft, mpb.PrependDecorators(
-		decor.Name("Validating URL & finding download link", decor.WC{W: len("Validating URL & finding download link") + 1, C: decor.DidentRight}),
+	ffs := createFF(urls, wg, spinnerProgress)
+
+	ffs = filterSlice(ffs)
+	download(ffs, wg, savePath)
+
+	if len(failure.infos) == 0 {
+		log.Entry().Info("All files were downloaded successfully!")
+		return nil
+	}
+
+	if len(failure.infos) == len(urls) {
+		log.Entry().Error("No file was downloaded!")
+	} else {
+		log.Entry().Errorf("%d out of %d were successfully downloaded!", len(urls)-len(failure.infos), len(urls))
+	}
+
+	for _, info := range failure.infos {
+		log.Entry().Errorf("Failed to process link '%s': %v", info.url, info.err)
+	}
+
+	return nil
+}
+
+func createFF(urls []string, wg *sync.WaitGroup, spinnerProgress *mpb.Progress) []*pkg.FFDownloader {
+	ffs := make([]*pkg.FFDownloader, 0)
+
+	spinner := spinnerProgress.AddSpinner(int64(len(urls)), mpb.PrependDecorators(
+		decor.Name("Validating URL & finding download link", decor.WC{W: len("Validating URL & finding download link") + 1, C: decor.DindentRight}),
 		decor.Counters(0, " %d / %d")),
 		mpb.AppendDecorators(decor.OnComplete(decor.EwmaETA(decor.ET_STYLE_GO, 60), "done")))
 
@@ -45,38 +73,76 @@ func ExecuteMultiDownload(savePath, inputFile, links string) error {
 	for _, url := range urls {
 		go func() {
 			defer wg.Done()
-			ff, err := pkg.NewFF(url, downloadProgressBar, spinner)
+			ff, err := pkg.NewFF(url, spinner)
 			if err != nil {
-				failed.sy.Lock()
-				defer failed.sy.Unlock()
+				failure.sy.Lock()
+				defer failure.sy.Unlock()
 				info := failureInfo{
 					url: url,
 					err: err,
 				}
-				failed.infos = append(failed.infos, info)
+				failure.infos = append(failure.infos, info)
 			}
 			ffs = append(ffs, ff)
 		}()
 	}
 
 	spinnerProgress.Wait()
+	return ffs
+}
 
-	if len(failed.infos) == 0 {
-		log.Entry().Info("All files were downloaded successfully!")
-		return nil
+func download(ffs []*pkg.FFDownloader, wg *sync.WaitGroup, savePath string) {
+	downloadProgressBar := mpb.New(mpb.WithWaitGroup(wg))
+	wg.Add(len(ffs))
+	for _, ff := range ffs {
+		size, err := getFileSize(ff.DownloadUrl())
+		if err != nil {
+			failure.sy.Lock()
+			info := failureInfo{
+				url: ff.PageUrl(),
+				err: err,
+			}
+			failure.infos = append(failure.infos, info)
+			failure.sy.Unlock()
+			continue
+		}
+		bar := downloadProgressBar.AddBar(size,
+			mpb.PrependDecorators(
+				decor.CountersKibiByte("% 6.1f / % 6.1f"),
+			),
+			mpb.AppendDecorators(
+				decor.EwmaETA(decor.ET_STYLE_MMSS, float64(size)/2048),
+				decor.Name(" ] "),
+				decor.EwmaSpeed(decor.SizeB1024(0), "% .2f", 30),
+			),
+		)
+
+		go func() {
+			defer wg.Done()
+			err := ff.Download(savePath, bar)
+			if err != nil {
+				failure.sy.Lock()
+				defer failure.sy.Unlock()
+				info := failureInfo{
+					url: ff.PageUrl(),
+					err: err,
+				}
+				failure.infos = append(failure.infos, info)
+			}
+		}()
 	}
+	downloadProgressBar.Wait()
+	log.Entry().Info("Download Completed!")
+}
 
-	if len(failed.infos) == len(urls) {
-		log.Entry().Error("No file was downloaded!")
-	} else {
-		log.Entry().Errorf("%d out of %d were successfully downloaded!", len(urls)-len(failed.infos), len(urls))
+func filterSlice(ff []*pkg.FFDownloader) []*pkg.FFDownloader {
+	res := make([]*pkg.FFDownloader, 0)
+	for _, f := range ff {
+		if f.IsValid() {
+			res = append(res, f)
+		}
 	}
-
-	for _, info := range failed.infos {
-		log.Entry().Errorf("Failed to process link '%s': %v", info.url, info.err)
-	}
-
-	return nil
+	return res
 }
 
 func getUrls(inputFile, links string) ([]string, error) {
@@ -103,4 +169,23 @@ func getUrlsFromFile(inputFilePath string) ([]string, error) {
 func getUrlsFromString(links string) ([]string, error) {
 	urls := strings.Split(links, ",")
 	return urls, nil
+}
+
+func getFileSize(url string) (int64, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return -1, err
+	}
+
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return -1, fmt.Errorf("server returned: %s", resp.Status)
+	}
+
+	if resp.ContentLength > 0 {
+		return resp.ContentLength, nil
+	}
+
+	return -1, fmt.Errorf("Content-Length not provided")
 }

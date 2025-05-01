@@ -4,14 +4,16 @@ package pkg
 import (
 	"bytes"
 	"errors"
+	"path/filepath"
 	"strings"
 
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 
-	"github.com/vbauerster/mpb"
-	_ "github.com/vbauerster/mpb/decor"
+	"github.com/vbauerster/mpb/v8"
+	_ "github.com/vbauerster/mpb/v8/decor"
 	"mvdan.cc/xurls/v2"
 )
 
@@ -20,14 +22,30 @@ type FFDownloader struct {
 	downloadUrl string
 	isValid     bool
 	fileName    string
-	progress    *mpb.Progress
 }
 
-func NewFF(pageUrl string, progress *mpb.Progress, spinner *mpb.Bar) (*FFDownloader, error) {
+func NewFF(pageUrl string, spinner *mpb.Bar) (*FFDownloader, error) {
 	ff := new(FFDownloader)
 	ff.pageUrl = pageUrl
-	ff.progress = progress
 	return ff, ff.validateAndPrepareDownload(spinner)
+}
+
+// getters
+
+func (ff *FFDownloader) PageUrl() string {
+	return ff.pageUrl
+}
+
+func (ff *FFDownloader) IsValid() bool {
+	return ff.isValid
+}
+
+func (ff *FFDownloader) DownloadUrl() string {
+	return ff.downloadUrl
+}
+
+func (ff *FFDownloader) FileName() string {
+	return ff.fileName
 }
 
 func (ff *FFDownloader) validateAndPrepareDownload(spinner *mpb.Bar) error {
@@ -60,8 +78,28 @@ func (ff *FFDownloader) validateAndPrepareDownload(spinner *mpb.Bar) error {
 	return nil
 }
 
-func (ff *FFDownloader) Download() error {
-	//bar := ff.progress.Add()
+func (ff *FFDownloader) Download(path string, bar *mpb.Bar) error {
+	url := ff.DownloadUrl()
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return err
+	}
+
+	destName := filepath.Join(path, ff.FileName())
+	dest, err := os.Create(destName)
+	if err != nil {
+		return err
+	}
+	defer dest.Close()
+
+	reader := bar.ProxyReader(resp.Body)
+	io.Copy(dest, reader)
 	return nil
 }
 
