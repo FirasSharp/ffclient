@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on tags like v1.0.0, v2.1.3, etc.
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]  # Build for Linux, MacOS, Windows
+        goarch: [amd64, arm64]           # Build for both architectures
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Required to get git commit history
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      - name: Get version from tag
+        id: tag
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Get commit hash
+        id: commit
+        run: echo "commit=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build
+        run: |
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
+            -ldflags "\
+            -X 'main.version=${{ steps.tag.outputs.version }}' \
+            -X 'main.commit=${{ steps.commit.outputs.commit }}' \
+            -X 'main.date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")'" \
+            -o ffclient-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }} .
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ffclient-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ffclient-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
+
+      - name: Create release
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'  # Only run once
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ffclient-linux-amd64
+            ffclient-linux-arm64
+            ffclient-darwin-amd64
+            ffclient-darwin-arm64
+            ffclient-windows-amd64.exe
+            ffclient-windows-arm64.exe
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
