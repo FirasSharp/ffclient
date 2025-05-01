@@ -1,4 +1,5 @@
 project_name: ffclient
+version: 2
 
 archives:
     formats: ["zip", "binary", "tar.gz"] 
