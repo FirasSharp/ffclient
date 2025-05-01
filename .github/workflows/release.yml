@@ -56,24 +56,16 @@ jobs:
 
       - name: Create release
         id: create_release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref }}
-          release_name: "Release v${{ github.ref_name }}"
-          draft: false
-          prerelease: false
-
-      - name: Upload assets
-        run: |
-          for file in artifacts/*; do
-            if [ -f "$file" ]; then
-              echo "Uploading $file"
-              gh release upload ${{ github.ref_name }} "$file" \
-                --repo $GITHUB_REPOSITORY \
-                --clobber
-            fi
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          release_name: Release v${{ github.ref_name }}
+          files: |
+            artifacts/ffclient-linux-amd64
+            artifacts/ffclient-linux-arm64
+            artifacts/ffclient-darwin-amd64
+            artifacts/ffclient-darwin-arm64
+            artifacts/ffclient-windows-amd64.exe
+            artifacts/ffclient-windows-arm64.exe
