@@ -1,8 +1,7 @@
 project_name: ffclient
 version: 2
 
-archives:
-    formats: ["zip", "binary", "tar.gz"] 
+
 
 builds:
   - env:
@@ -13,6 +12,7 @@ builds:
       - windows
     goarch:
       - amd64
+      - arm64
     flags:
       - -trimpath
     ldflags:
@@ -21,6 +21,10 @@ builds:
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
     binary: ffclient
+
+archives:
+  - 
+    formats: ["zip", "binary", "tar.gz"] 
 
 release:
   github:
