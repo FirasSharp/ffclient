@@ -5,9 +5,11 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
-  build:
-    name: Build
+  build-and-release:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -22,55 +24,67 @@ jobs:
 
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.24.0'
+          go-version: '1.21'
 
-      - name: Get version
+      - name: Get version from tag
         id: tag
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Get commit
-        id: commit
-        run: echo "commit=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Build
+      - name: Build binaries
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
             -ldflags "\
             -X 'main.version=${{ steps.tag.outputs.version }}' \
-            -X 'main.commit=${{ steps.commit.outputs.commit }}' \
+            -X 'main.commit=$(git rev-parse --short HEAD)' \
             -X 'main.date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")'" \
             -o ffclient-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }} .
 
-      - name: Upload artifact
+      - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
           name: ffclient-${{ matrix.goos }}-${{ matrix.goarch }}
           path: ffclient-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}
 
-  release:
-    name: Release
-    needs: build
+  create-release:
+    needs: build-and-release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          path: ./artifacts
+
+      - name: List artifacts for debugging
+        run: ls -R ./artifacts
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: "v${{ needs.build.outputs.version }}"
-          files: |
-            artifacts/ffclient-linux-amd64
-            artifacts/ffclient-linux-arm64
-            artifacts/ffclient-darwin-amd64
-            artifacts/ffclient-darwin-arm64
-            artifacts/ffclient-windows-amd64.exe
-            artifacts/ffclient-windows-arm64.exe
+        id: create_release
+        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release v${GITHUB_REF#refs/tags/v}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/ffclient-linux-amd64
+          asset_name: ffclient-linux-amd64
+          asset_content_type: application/octet-stream
+
+      - name: Upload all other assets
+        run: |
+          for file in ./artifacts/*; do
+            name=$(basename $file)
+            curl -s \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary @"$file" \
+              "${{ steps.create_release.outputs.upload_url }}?name=$name"
+          done
