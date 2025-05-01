@@ -26,15 +26,22 @@ func NewFF(url string, progress *mpb.Progress, spinner *mpb.Bar) (*FF, error) {
 	ff := new(FF)
 	ff.url = url
 	ff.progress = progress
-	return ff, ff.checkURLAndExtractDownload(spinner)
+	return ff, ff.checkURLAndExtractDownloadInfos(spinner)
 }
 
-func (ff *FF) checkURLAndExtractDownload(spinner *mpb.Bar) error {
+func (ff *FF) checkURLAndExtractDownloadInfos(spinner *mpb.Bar) error {
 	defer spinner.Increment()
 	if !ff.validateUrl() {
 		return errors.New("Invalid Url!")
 	}
-	downloadUrl, err := ff.extractDownloadLink()
+
+	body, err := ff.makeHTTPrequest()
+
+	if err != nil {
+		return err
+	}
+
+	downloadUrl, err := ff.extractDownloadLink(body)
 	if err != nil {
 		return err
 	}
@@ -57,22 +64,9 @@ func (ff *FF) validateUrl() bool {
 	return (link.Host == ffdomain.Host) && (link.Scheme == ffdomain.Scheme)
 }
 
-func (ff *FF) extractDownloadLink() (string, error) {
-	resp, err := http.Get(ff.url)
-	if err != nil {
-		return "", err
-	}
-
-	defer resp.Body.Close()
-
-	bytes, err := io.ReadAll(resp.Body)
-
-	if err != nil {
-		return "", err
-	}
-
+func (ff *FF) extractDownloadLink(body []byte) (string, error) {
 	rxRelaxed := xurls.Relaxed()
-	urls := rxRelaxed.FindAllString(string(bytes), -1)
+	urls := rxRelaxed.FindAllString(string(body), -1)
 
 	for _, url := range urls {
 		if strings.HasPrefix(url, "https://fuckingfast.co/dl/") {
@@ -81,4 +75,21 @@ func (ff *FF) extractDownloadLink() (string, error) {
 	}
 
 	return "", errors.New("Download url was not found!")
+}
+
+func (ff *FF) makeHTTPrequest() ([]byte, error) {
+	resp, err := http.Get(ff.url)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	bytes, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return bytes, nil
 }
