@@ -7,8 +7,7 @@ A fast and efficient command-line client for downloading files from [FuckingFast
 
 ## Features
 
-- Multi-file download support
-- Input from command line or text file
+- Multi-file download support (parallel)
 - Simple and fast
 - Cross-platform (Windows, Linux, macOS)
 
@@ -55,11 +54,6 @@ ffclient [flags]
 3. Download files from a text file:
    ```sh
    ffclient --inputFile downloads.txt --savePath ~/Downloads/fast_files
-   ```
-
-4. Combine both methods (files from inputFile and links will be downloaded):
-   ```sh
-   ffclient --inputFile downloads.txt --links "https://fuckingfast.co/another_file"
    ```
 
 ## Input File Format
