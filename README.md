@@ -56,11 +56,6 @@ ffclient [flags]
    ffclient --inputFile downloads.txt --savePath ~/Downloads/fast_files
    ```
 
-4. Combine both methods (files from inputFile and links will be downloaded):
-   ```sh
-   ffclient --inputFile downloads.txt --links "https://fuckingfast.co/another_file"
-   ```
-
 ## Input File Format
 
 The input file should contain one FuckingFast.co URL per line:
