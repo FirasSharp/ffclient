@@ -45,7 +45,7 @@ var opts Options
 
 // Version will be set during build
 var (
-	version = "0.1.0-dev" // default version for dev builds
+	version = "0.1.2-dev" // default version for dev builds
 	commit  = "none"
 	date    = "unknown"
 )
