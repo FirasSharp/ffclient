@@ -21,7 +21,14 @@ builds:
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
     binary: ffclient
-
+    # Enable build metadata collection
+    buildmode: pie
+    # Required to capture VCS info
+    asmflags:
+      - -trimpath
+    gcflags:
+      - -trimpath
+      
 archives:
   - 
     formats: ["zip", "binary", "tar.gz"] 
