@@ -29,12 +29,11 @@ import (
 	"strings"
 	"sync"
 
-	"net/http"
-
 	"github.com/FirasSharp/ffclient/pkg"
 	"github.com/SAP/jenkins-library/pkg/log"
 	"github.com/vbauerster/mpb/v8"
 	"github.com/vbauerster/mpb/v8/decor"
+	"net/http"
 )
 
 type failureInfo struct {

@@ -36,9 +36,9 @@ import (
 )
 
 type Options struct {
-	savePath  string
-	inputFile string
-	links     string
+	SavePath  string
+	InputFile string
+	Links     string
 }
 
 var opts Options
@@ -51,12 +51,12 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "ff",
-	Short: "Client for multi download from https://fuckingfast.co/",
-	Long:  `Client made to download multiple files from the  https://fuckingfast.co/ hosting service.`,
+	Use:     "ff",
+	Short:   "Client for multi download from https://fuckingfast.co/",
+	Long:    `Client made to download multiple files from the  https://fuckingfast.co/ hosting service.`,
 	Version: fmt.Sprintf("%s\ncommit: %s\nbuilt: %s", version, getCommit(), getDate()),
 	Run: func(_ *cobra.Command, _ []string) {
-		if err := cmd.ExecuteMultiDownload(opts.savePath, opts.inputFile, opts.links); err != nil {
+		if err := cmd.ExecuteMultiDownload(opts.SavePath, opts.InputFile, opts.Links); err != nil {
 			log.Entry().WithError(err).Fatal()
 		}
 		log.Entry().Info("Successfully executed!")
@@ -69,11 +69,12 @@ func main() {
 		log.Entry().Errorf("Error getting download path: %v\n", err)
 		return
 	}
-	rootCmd.Flags().StringVar(&opts.savePath, "savePath", defaultPath, "Destination directory for downloaded files.")
-	rootCmd.Flags().StringVar(&opts.inputFile, "inputFile", "", "Text file containing URLs to download (one fuckingfast.co URL per line)")
-	rootCmd.Flags().StringVar(&opts.links, "links", "", "Comma-separated fuckingfast.co URLs (e.g., \"https://fuckingfast.co/file1,https://fuckingfast.co/file2\")")
+	rootCmd.Flags().StringVarP(&opts.SavePath, "savePath", "s", defaultPath, "Destination directory for downloaded files.")
+	rootCmd.Flags().StringVarP(&opts.InputFile, "inputFile", "i", "", "Text file containing URLs to download (one fuckingfast.co URL per line)")
+	rootCmd.Flags().StringVarP(&opts.Links, "links", "l", "", "Comma-separated fuckingfast.co URLs (e.g., \"https://fuckingfast.co/file1,https://fuckingfast.co/file2\")")
 	rootCmd.MarkFlagsMutuallyExclusive("inputFile", "links")
 	rootCmd.MarkFlagsOneRequired("inputFile", "links")
+
 	if err := rootCmd.Execute(); err != nil {
 		log.Entry().Error(err)
 		os.Exit(1)
