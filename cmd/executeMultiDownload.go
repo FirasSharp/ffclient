@@ -1,25 +1,27 @@
-//MIT License
+// MIT License
+//
+// Copyright (c) 2025 Firas Jelassi
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-//Copyright (c) 2025 Firas Jelassi
-
-//Permission is hereby granted, free of charge, to any person obtaining a copy
-//of this software and associated documentation files (the "Software"), to deal
-//in the Software without restriction, including without limitation the rights
-//to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//copies of the Software, and to permit persons to whom the Software is
-//furnished to do so, subject to the following conditions:
-
-//The above copyright notice and this permission notice shall be included in all
-//copies or substantial portions of the Software.
-
-//THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-//SOFTWARE.
-
+// Package cmd implements the command-line interface for the ffclient application,
+// handling the multi-download functionality from https://fuckingfast.co/
 package cmd
 
 import (
@@ -36,31 +38,33 @@ import (
 	"net/http"
 )
 
+// failureInfo contains information about a failed download attempt
 type failureInfo struct {
-	url string
-	err error
+	url string // The URL that failed to download
+	err error  // The error that occurred
 }
 
+// failed tracks all download failures in a thread-safe manner
 type failed struct {
-	infos []failureInfo
-	sy    sync.Mutex
+	infos []failureInfo // Slice of failure information
+	sy    sync.Mutex    // Mutex for thread-safe operations
 }
 
 var failure = &failed{}
 
+// ExecuteMultiDownload coordinates the multi-file download process.
+// It takes a save path, input file path, and comma-separated links as input.
+// Returns an error if the download process fails completely.
 func ExecuteMultiDownload(savePath, inputFile, links string) error {
-
 	wg := new(sync.WaitGroup)
 	spinnerProgress := mpb.New(mpb.WithWaitGroup(wg))
 
 	urls, err := getUrls(inputFile, links)
-
 	if err != nil {
 		return err
 	}
 
 	ffs := createFF(urls, wg, spinnerProgress)
-
 	ffs = filterSlice(ffs)
 	download(ffs, wg, savePath)
 
@@ -82,6 +86,9 @@ func ExecuteMultiDownload(savePath, inputFile, links string) error {
 	return nil
 }
 
+// createFF initializes FFDownloader instances for each URL with progress tracking.
+// Takes a slice of URLs, a wait group, and a progress bar container.
+// Returns a slice of initialized FFDownloader instances.
 func createFF(urls []string, wg *sync.WaitGroup, spinnerProgress *mpb.Progress) []*pkg.FFDownloader {
 	ffs := make([]*pkg.FFDownloader, 0)
 
@@ -112,6 +119,8 @@ func createFF(urls []string, wg *sync.WaitGroup, spinnerProgress *mpb.Progress) 
 	return ffs
 }
 
+// download performs the actual file downloads with progress tracking.
+// Takes a slice of FFDownloader instances, a wait group, and the save path.
 func download(ffs []*pkg.FFDownloader, wg *sync.WaitGroup, savePath string) {
 	downloadProgressBar := mpb.New(mpb.WithWaitGroup(wg))
 	wg.Add(len(ffs))
@@ -135,6 +144,9 @@ func download(ffs []*pkg.FFDownloader, wg *sync.WaitGroup, savePath string) {
 				decor.EwmaETA(decor.ET_STYLE_MMSS, float64(size)/2048),
 				decor.Name(" ] "),
 				decor.EwmaSpeed(decor.SizeB1024(0), "% .2f", 30),
+				decor.OnComplete(
+					decor.EwmaETA(decor.ET_STYLE_GO, 30, decor.WCSyncWidth), "done",
+				),
 			),
 		)
 
@@ -156,6 +168,8 @@ func download(ffs []*pkg.FFDownloader, wg *sync.WaitGroup, savePath string) {
 	log.Entry().Info("Download Completed!")
 }
 
+// filterSlice removes any invalid FFDownloader instances from the slice.
+// Takes a slice of FFDownloader instances and returns a filtered slice.
 func filterSlice(ff []*pkg.FFDownloader) []*pkg.FFDownloader {
 	res := make([]*pkg.FFDownloader, 0)
 	for _, f := range ff {
@@ -166,6 +180,9 @@ func filterSlice(ff []*pkg.FFDownloader) []*pkg.FFDownloader {
 	return res
 }
 
+// getUrls retrieves URLs either from a file or from a comma-separated string.
+// Takes an input file path and a comma-separated string of links.
+// Returns a slice of URLs or an error if reading fails.
 func getUrls(inputFile, links string) ([]string, error) {
 	if len(inputFile) > 0 {
 		return getUrlsFromFile(inputFile)
@@ -173,6 +190,8 @@ func getUrls(inputFile, links string) ([]string, error) {
 	return getUrlsFromString(links)
 }
 
+// getUrlsFromFile reads URLs from a text file (one URL per line).
+// Takes a file path and returns a slice of URLs or an error if reading fails.
 func getUrlsFromFile(inputFilePath string) ([]string, error) {
 	result := make([]string, 0)
 	file, err := os.Open(inputFilePath)
@@ -187,11 +206,15 @@ func getUrlsFromFile(inputFilePath string) ([]string, error) {
 	return result, nil
 }
 
+// getUrlsFromString splits a comma-separated string into individual URLs.
+// Takes a comma-separated string and returns a slice of URLs.
 func getUrlsFromString(links string) ([]string, error) {
 	urls := strings.Split(links, ",")
 	return urls, nil
 }
 
+// getFileSize retrieves the size of a remote file via HTTP HEAD request.
+// Takes a URL and returns the file size in bytes or an error if the request fails.
 func getFileSize(url string) (int64, error) {
 	resp, err := http.Get(url)
 	if err != nil {
