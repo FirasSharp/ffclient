@@ -52,6 +52,17 @@ type failed struct {
 
 var failure = &failed{}
 
+// report is a method used to save errors in the slice found inside the failed structure to be reported afterwards
+func (f *failed) report(url string, err error) {
+	f.sy.Lock()
+	defer f.sy.Unlock()
+	info := failureInfo{
+		url: url,
+		err: err,
+	}
+	f.infos = append(f.infos, info)
+}
+
 // ExecuteMultiDownload coordinates the multi-file download process.
 // It takes a save path, input file path, and comma-separated links as input.
 // Returns an error if the download process fails completely.
@@ -103,13 +114,7 @@ func createFF(urls []string, wg *sync.WaitGroup, spinnerProgress *mpb.Progress) 
 			defer wg.Done()
 			ff, err := pkg.NewFF(url, spinner)
 			if err != nil {
-				failure.sy.Lock()
-				defer failure.sy.Unlock()
-				info := failureInfo{
-					url: url,
-					err: err,
-				}
-				failure.infos = append(failure.infos, info)
+				failure.report(url, err)
 			}
 			ffs = append(ffs, ff)
 		}()
@@ -127,13 +132,7 @@ func download(ffs []*pkg.FFDownloader, wg *sync.WaitGroup, savePath string) {
 	for _, ff := range ffs {
 		size, err := getFileSize(ff.DownloadUrl())
 		if err != nil {
-			failure.sy.Lock()
-			info := failureInfo{
-				url: ff.PageUrl(),
-				err: err,
-			}
-			failure.infos = append(failure.infos, info)
-			failure.sy.Unlock()
+			failure.report(ff.PageUrl(), err)
 			continue
 		}
 		bar := downloadProgressBar.AddBar(size,
@@ -154,13 +153,7 @@ func download(ffs []*pkg.FFDownloader, wg *sync.WaitGroup, savePath string) {
 			defer wg.Done()
 			err := ff.Download(savePath, bar)
 			if err != nil {
-				failure.sy.Lock()
-				defer failure.sy.Unlock()
-				info := failureInfo{
-					url: ff.PageUrl(),
-					err: err,
-				}
-				failure.infos = append(failure.infos, info)
+				failure.report(ff.PageUrl(), err)
 			}
 		}()
 	}
