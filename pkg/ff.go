@@ -132,7 +132,12 @@ func (ff *FFDownloader) Download(path string, bar *mpb.Bar) error {
 	defer dest.Close()
 
 	reader := bar.ProxyReader(resp.Body)
-	io.Copy(dest, reader)
+	
+	_, err = io.Copy(dest, reader)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
