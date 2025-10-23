@@ -35,7 +35,7 @@ ffclient [flags]
 
 | Flag        | Description                                                                 | Default Value       |
 |-------------|-----------------------------------------------------------------------------|---------------------|
-| `--savePath` | Destination directory for downloaded files                                  | Current directory   |
+| `--savePath` | Destination directory for downloaded files                                  | Default OS download directory   |
 | `--inputFile` | Text file containing URLs to download (one fuckingfast.co URL per line)    | ""                  |
 | `--links`    | Comma-separated fuckingfast.co URLs                                        | ""                  |
 
