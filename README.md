@@ -1,6 +1,6 @@
 # ffclient - FuckingFast.co Download Client
 
-A fast and efficient command-line client for downloading files from [FuckingFast.co](https://fuckingfast.co/) with multi-download support, written in Go.
+A fast and efficient command-line client for downloading files from the file hosting service [FuckingFast.co](https://fuckingfast.co/) with multi-download support, written in Go.
 
 ![Go Version](https://img.shields.io/badge/go-%3E%3D1.20-blue.svg)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
