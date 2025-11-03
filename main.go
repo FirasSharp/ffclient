@@ -28,7 +28,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"runtime/debug"
 	"time"
 
@@ -69,12 +68,12 @@ var rootCmd = &cobra.Command{
 
 // main is the entry point for the application
 func main() {
-	defaultPath, err := getDefaultDownloadPath()
+	currentPath, err := getCurrentPath()
 	if err != nil {
 		log.Entry().Errorf("Error getting download path: %v\n", err)
 		return
 	}
-	rootCmd.Flags().StringVarP(&opts.SavePath, "savePath", "s", defaultPath, "Destination directory for downloaded files.")
+	rootCmd.Flags().StringVarP(&opts.SavePath, "savePath", "s", currentPath, "Destination directory for downloaded files.")
 	rootCmd.Flags().StringVarP(&opts.InputFile, "inputFile", "i", "", "Text file containing URLs to download (one fuckingfast.co URL per line)")
 	rootCmd.Flags().StringVarP(&opts.Links, "links", "l", "", "Comma-separated fuckingfast.co URLs (e.g., \"https://fuckingfast.co/file1,https://fuckingfast.co/file2\")")
 	rootCmd.MarkFlagsMutuallyExclusive("inputFile", "links")
@@ -124,29 +123,12 @@ func getDate() string {
 	return time.Now().Format("2006-01-02 15:04:05")
 }
 
-// getDefaultDownloadPath determines the appropriate default download directory
-// based on the operating system. For Windows it uses USERPROFILE\Downloads,
-// for Linux it first checks XDG_DOWNLOAD_DIR, and for all other systems
-// it falls back to ~/Downloads.
+// getCurrentPath returns current path
 // Returns an error if the home directory cannot be determined.
-func getDefaultDownloadPath() (string, error) {
-	switch runtime.GOOS {
-	case "windows":
-		dir := os.Getenv("USERPROFILE")
-		if dir == "" {
-			return "", fmt.Errorf("USERPROFILE environment variable not set")
-		}
-		return filepath.Join(dir, "Downloads"), nil
-	case "linux":
-		dir := os.Getenv("XDG_DOWNLOAD_DIR")
-		if dir != "" {
-			return dir, nil
-		}
-	}
-	// Fallback for mac, linux if XDG_DOWNLOAD_DIR is not set and other unix-like OSes
-	dir, err := os.UserHomeDir()
+func getCurrentPath() (string, error) {
+	ex, err := os.Executable()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "Downloads"), nil
+	return filepath.Dir(ex), nil
 }
