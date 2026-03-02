@@ -126,7 +126,7 @@ func getDate() string {
 // getCurrentPath returns current path
 // Returns an error if the home directory cannot be determined.
 func getCurrentPath() (string, error) {
-	ex, err := os.Executable()
+	ex, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
