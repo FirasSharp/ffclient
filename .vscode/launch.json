@@ -5,6 +5,14 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "debug download without file",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/main.go",
+      "args": ["-l", "https://fuckingfast.co/sbappzvpqag3", "--savePath", "/Users/firasjelassi/Documents/GitHub/ffclient/test"]
+    },
+    {
       "name": "debug download",
       "type": "go",
       "request": "launch",
