@@ -24,7 +24,6 @@
 package pkg
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -37,6 +36,7 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/vbauerster/mpb/v8"
 	_ "github.com/vbauerster/mpb/v8/decor"
 )
@@ -101,18 +101,17 @@ func (ff *FFDownloader) validateAndPrepareDownload(spinner *mpb.Bar) error {
 		return errors.New("Invalid Url!")
 	}
 
-	err := ff.extractDownloadURL(sourcePath)
+	fileName, err := ff.getFileName()
 	if err != nil {
 		return err
 	}
 
-	body, err := ff.fetchPageContent()
+	err = ff.extractDownloadURL(sourcePath)
+	if err != nil {
+		return err
+	}
 
 	ff.isValid = true
-	fileName, err := ff.getFileName(body)
-	if err != nil {
-		return err
-	}
 
 	ff.fileName = fileName
 
@@ -171,10 +170,11 @@ func (ff *FFDownloader) extractDownloadURL(sourcePath string) error {
 	pageUrl = fmt.Sprintf(pageUrl, sourcePath)
 	req, err := http.NewRequest("POST", pageUrl, nil)
 	req.Header.Set("Accept", "*/*")
-	req.Header.Set("Accept-Encoding", "gzip, deflate, br, zstd")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.7")
 	req.Header.Set("Content-Length", "0")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", "https://fuckingfast.co")
+	req.Header.Set("Referer", pageUrl)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36")
 
 	resp, err := client.Do(req)
@@ -188,34 +188,29 @@ func (ff *FFDownloader) extractDownloadURL(sourcePath string) error {
 	return nil
 }
 
-// fetchPageContent retrieves the content of the page URL.
-// Returns the page content as a byte slice or an error if the request fails.
-func (ff *FFDownloader) fetchPageContent() ([]byte, error) {
+// getFileName retrieves the content of the page URL.
+// Returns the title or an error.
+func (ff *FFDownloader) getFileName() (string, error) {
 
 	req, err := http.NewRequest("GET", ff.pageUrl, nil)
 	req.Header.Set("Accept", "*/*")
-	req.Header.Set("Accept-Encoding", "gzip, deflate, br, zstd")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.7")
 	req.Header.Set("Content-Length", "0")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", "https://fuckingfast.co")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36")
 
 	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
 	defer resp.Body.Close()
-	bytes, err := io.ReadAll(resp.Body)
-
-	return bytes, nil
-}
-
-// getFileName extracts the filename from the page content.
-// It takes the page content as a byte slice and returns the filename or an error.
-func (ff *FFDownloader) getFileName(body []byte) (string, error) {
-	title, _, err := GetHtmlTitle(bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	title := strings.TrimSpace(doc.Find("span.text-xl").First().Text())
 	return title, nil
 }
