@@ -196,6 +196,9 @@ func getUrlsFromFile(inputFilePath string) ([]string, error) {
 	for s.Scan() {
 		result = append(result, s.Text())
 	}
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
