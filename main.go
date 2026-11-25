@@ -41,6 +41,7 @@ type Options struct {
 	SavePath  string // Destination directory for downloaded files
 	InputFile string // Text file containing URLs to download (one per line)
 	Links     string // Comma-separated URLs to download
+	Concurrency   uint8
 }
 
 var opts Options
@@ -59,7 +60,7 @@ var rootCmd = &cobra.Command{
 	Long:    `Client made to download multiple files from the https://fuckingfast.co/ hosting service.`,
 	Version: fmt.Sprintf("%s\ncommit: %s\nbuilt: %s", version, getCommit(), getDate()),
 	Run: func(_ *cobra.Command, _ []string) {
-		if err := cmd.ExecuteMultiDownload(opts.SavePath, opts.InputFile, opts.Links); err != nil {
+		if err := cmd.ExecuteMultiDownload(opts.SavePath, opts.InputFile, opts.Links, opts.Concurrency); err != nil {
 			log.Entry().WithError(err).Fatal()
 		}
 		log.Entry().Info("Successfully executed!")
@@ -76,6 +77,7 @@ func main() {
 	rootCmd.Flags().StringVarP(&opts.SavePath, "savePath", "s", currentPath, "Destination directory for downloaded files.")
 	rootCmd.Flags().StringVarP(&opts.InputFile, "inputFile", "i", "", "Text file containing URLs to download (one fuckingfast.co URL per line)")
 	rootCmd.Flags().StringVarP(&opts.Links, "links", "l", "", "Comma-separated fuckingfast.co URLs (e.g., \"https://fuckingfast.co/file1,https://fuckingfast.co/file2\")")
+	rootCmd.Flags().Uint8VarP(&opts.Concurrency, "concurrency", "c", 0, "Max number of simultaneous downloads, e.g. -c 4 downloads 4 files at a time (0 = no limit, download all at once)")
 	rootCmd.MarkFlagsMutuallyExclusive("inputFile", "links")
 	rootCmd.MarkFlagsOneRequired("inputFile", "links")
 

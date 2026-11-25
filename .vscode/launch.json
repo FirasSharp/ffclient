@@ -18,7 +18,7 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}/main.go",
-      "args": ["--inputFile", "input.txt", "--savePath", "D:\\ff"]
+      "args": ["--inputFile", "input.txt", "--savePath", "D:\\ff", "-c", "2"]
     },
     {
       "name": "debug versioning",
