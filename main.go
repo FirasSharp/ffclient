@@ -81,6 +81,16 @@ func main() {
 	rootCmd.MarkFlagsMutuallyExclusive("inputFile", "links")
 	rootCmd.MarkFlagsOneRequired("inputFile", "links")
 
+	fmt.Println(`
+/*
+* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* ~     ___  ___   __  __    __  ___  _  _  ____     ~
+* ~    (  _)(  _) / _)(  )  (  )(  _)( \( )(_  _)    ~
+* ~     ) _) ) _)( (_  )(__  )(  ) _) )  (   )(      ~
+* ~    (_)  (_)   \__)(____)(__)(___)(_)\_) (__)     ~
+* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/`)
+
 	if err := rootCmd.Execute(); err != nil {
 		log.Entry().Error(err)
 		os.Exit(1)

@@ -79,8 +79,10 @@ func ExecuteMultiDownload(savePath, inputFile, links string, concurrency uint8) 
 	ffs = filterSlice(ffs)
 	batchedffs := batchForDownload(ffs, concurrency)
 
-	for _, batch := range batchedffs {
+	for i, batch := range batchedffs {
+		log.Entry().Infof("Executing download on batch #%v", i)
 		download(batch, wg, savePath)
+		log.Entry().Infof("Batch #%v completed!", i)
 	}
 
 	if len(failure.infos) == 0 {
@@ -141,14 +143,14 @@ func download(ffs []*pkg.FFDownloader, wg *sync.WaitGroup, savePath string) {
 		}
 		bar := downloadProgressBar.AddBar(size,
 			mpb.PrependDecorators(
+				decor.Name(ff.FileName(), decor.WCSyncSpaceR),
 				decor.CountersKibiByte("% 6.1f / % 6.1f"),
 			),
 			mpb.AppendDecorators(
-				decor.EwmaETA(decor.ET_STYLE_MMSS, float64(size)/2048),
-				decor.Name(" ] "),
-				decor.EwmaSpeed(decor.SizeB1024(0), "% .2f", 30),
+				decor.NewPercentage("%d", decor.WCSyncSpace),
+				decor.EwmaSpeed(decor.SizeB1024(0), "% .1f", 30, decor.WCSyncSpace),
 				decor.OnComplete(
-					decor.EwmaETA(decor.ET_STYLE_GO, 30, decor.WCSyncWidth), "done",
+					decor.EwmaETA(decor.ET_STYLE_MMSS, 30, decor.WCSyncSpace), "done",
 				),
 			),
 		)
@@ -162,7 +164,6 @@ func download(ffs []*pkg.FFDownloader, wg *sync.WaitGroup, savePath string) {
 		}()
 	}
 	downloadProgressBar.Wait()
-	log.Entry().Info("Download Completed!")
 }
 
 // filterSlice removes any invalid FFDownloader instances from the slice.
