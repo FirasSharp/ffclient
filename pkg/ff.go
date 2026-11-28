@@ -122,16 +122,27 @@ func (ff *FFDownloader) validateAndPrepareDownload(spinner *mpb.Bar) error {
 // It takes a destination path and a progress bar as parameters.
 // Returns an error if the download fails at any stage.
 func (ff *FFDownloader) Download(path string, bar *mpb.Bar) error {
-	url := ff.DownloadUrl()
+	t := &http.Transport{
+		Proxy:     http.ProxyFromEnvironment,
+		Protocols: new(http.Protocols),
+	}
+	t.Protocols.SetHTTP1(true) // using http 1.1 so concurrent requests use each their own connection and improve download speed 
+	c := &http.Client{Transport: t} 
 
-	resp, err := http.Get(url)
+	req, err := http.NewRequest(http.MethodGet, ff.DownloadUrl(), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36")
+
+	resp, err := c.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return err
+		return fmt.Errorf("download for %s failed with status: %v", ff.FileName(), resp.StatusCode)
 	}
 
 	destName := filepath.Join(path, ff.FileName())
@@ -141,7 +152,14 @@ func (ff *FFDownloader) Download(path string, bar *mpb.Bar) error {
 	}
 	defer dest.Close()
 
-	reader := bar.ProxyReader(resp.Body)
+	reader, err := bar.ProxyReader(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		_ = reader.Close()
+	}()
 
 	_, err = io.Copy(dest, reader)
 	if err != nil {

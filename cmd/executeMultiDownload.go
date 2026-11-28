@@ -66,7 +66,7 @@ func (f *failed) report(url string, err error) {
 // ExecuteMultiDownload coordinates the multi-file download process.
 // It takes a save path, input file path, and comma-separated links as input.
 // Returns an error if the download process fails completely.
-func ExecuteMultiDownload(savePath, inputFile, links string) error {
+func ExecuteMultiDownload(savePath, inputFile, links string, concurrency uint8) error {
 	wg := new(sync.WaitGroup)
 	spinnerProgress := mpb.New(mpb.WithWaitGroup(wg))
 
@@ -77,7 +77,13 @@ func ExecuteMultiDownload(savePath, inputFile, links string) error {
 
 	ffs := createFF(urls, wg, spinnerProgress)
 	ffs = filterSlice(ffs)
-	download(ffs, wg, savePath)
+	batchedffs := batchForDownload(ffs, concurrency)
+
+	for i, batch := range batchedffs {
+		log.Entry().Infof("Executing download on batch #%v", i)
+		download(batch, wg, savePath)
+		log.Entry().Infof("Batch #%v completed!", i)
+	}
 
 	if len(failure.infos) == 0 {
 		log.Entry().Info("All files were downloaded successfully!")
@@ -137,14 +143,14 @@ func download(ffs []*pkg.FFDownloader, wg *sync.WaitGroup, savePath string) {
 		}
 		bar := downloadProgressBar.AddBar(size,
 			mpb.PrependDecorators(
+				decor.Name(ff.FileName(), decor.WCSyncSpaceR),
 				decor.CountersKibiByte("% 6.1f / % 6.1f"),
 			),
 			mpb.AppendDecorators(
-				decor.EwmaETA(decor.ET_STYLE_MMSS, float64(size)/2048),
-				decor.Name(" ] "),
-				decor.EwmaSpeed(decor.SizeB1024(0), "% .2f", 30),
+				decor.NewPercentage("%d", decor.WCSyncSpace),
+				decor.EwmaSpeed(decor.SizeB1024(0), "% .1f", 30, decor.WCSyncSpace),
 				decor.OnComplete(
-					decor.EwmaETA(decor.ET_STYLE_GO, 30, decor.WCSyncWidth), "done",
+					decor.EwmaETA(decor.ET_STYLE_MMSS, 30, decor.WCSyncSpace), "done",
 				),
 			),
 		)
@@ -158,7 +164,6 @@ func download(ffs []*pkg.FFDownloader, wg *sync.WaitGroup, savePath string) {
 		}()
 	}
 	downloadProgressBar.Wait()
-	log.Entry().Info("Download Completed!")
 }
 
 // filterSlice removes any invalid FFDownloader instances from the slice.
@@ -171,6 +176,38 @@ func filterSlice(ff []*pkg.FFDownloader) []*pkg.FFDownloader {
 		}
 	}
 	return res
+}
+
+// batchForDownload splits ff into consecutive batches of at most size
+// downloaders, so the caller can process one batch at a time.
+//
+// If size is 0, concurrency is treated as unlimited and all downloaders are
+// returned in a single batch. The order of ff is preserved, and the returned
+// batches share the underlying *pkg.FFDownloader values with ff (they are not
+// copied).
+func batchForDownload(ff []*pkg.FFDownloader, size uint8) [][]*pkg.FFDownloader {
+	batch := make([][]*pkg.FFDownloader, 0)
+
+	if size == 0 {
+		log.Entry().Info("Concurrency set to 0, downloading everything concurrently in a single batch")
+		batch = append(batch, ff)
+		return batch
+	}
+
+	log.Entry().Infof("Concurrency set to %d, downloading in batches of %d", size, size)
+
+	tmp := make([]*pkg.FFDownloader, 0)
+	for _, f := range ff {
+		tmp = append(tmp, f)
+		if len(tmp) == int(size) {
+			batch = append(batch, tmp)
+			tmp = make([]*pkg.FFDownloader, 0)
+		}
+	}
+	if len(tmp) > 0 {
+		batch = append(batch, tmp)
+	}
+	return batch
 }
 
 // getUrls retrieves URLs either from a file or from a comma-separated string.
